@@ -110,6 +110,7 @@ input {
   padding: 1.25rem;
   margin-bottom: 1rem;
   box-shadow: 0 2px 12px rgba(26, 26, 46, 0.06);
+  min-width: 0;
 }
 
 .card__title {
@@ -179,9 +180,72 @@ input {
   margin-top: 0.75rem;
 }
 
-.weight-input__field--date {
+.weight-input {
   width: 100%;
+  min-width: 0;
+}
+
+.weight-input__date-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-bottom: 0.25rem;
+}
+
+.weight-input__field--date {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-right: 2.75rem;
+  box-sizing: border-box;
+  -webkit-min-logical-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.weight-input__field--date::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+.weight-input__field--date::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0;
+  width: 2.75rem;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.weight-input__date-button {
+  position: absolute;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.weight-input__date-button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+
+.weight-input__date-icon {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .weight-input__row {
@@ -193,6 +257,7 @@ input {
 
 .weight-input__field {
   flex: 1;
+  min-width: 0;
   min-height: 44px;
   padding: 0.6rem 0.75rem;
   border: 1px solid #cbd5e1;
