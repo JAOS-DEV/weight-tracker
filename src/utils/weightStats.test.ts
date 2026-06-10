@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { WeightEntry } from "../types/weight";
 import {
   getAverage,
+  getGoalProgress,
+  getLoggingStreak,
+  getMonthOverMonthComparison,
+  getMovingAverageSeries,
   getStatsForRange,
+  getWeeklySummary,
   sortEntriesByDate,
   upsertEntryForDate,
 } from "./weightStats";
@@ -69,5 +74,36 @@ describe("weightStats", () => {
     expect(stats.averageWeight).toBe(99.3);
     expect(stats.highestWeight).toBe(100);
     expect(stats.lowestWeight).toBe(98);
+  });
+
+  it("builds a seven day moving average series", () => {
+    const series = getMovingAverageSeries(sampleEntries, "kg", 7);
+    expect(series).toHaveLength(3);
+    expect(series[0].value).toBe(100);
+    expect(series[1].value).toBe(98);
+    expect(series[2].value).toBe(99.8);
+  });
+
+  it("calculates goal progress", () => {
+    const progress = getGoalProgress(sampleEntries, 95, "kg");
+    expect(progress.latestWeight).toBe(99.8);
+    expect(progress.remaining).toBe(4.8);
+  });
+
+  it("returns weekly summary values", () => {
+    const summary = getWeeklySummary(sampleEntries, "kg");
+    expect(summary.daysLogged).toBeGreaterThanOrEqual(0);
+    expect(summary.highest === null || typeof summary.highest === "number").toBe(
+      true,
+    );
+  });
+
+  it("returns month comparison values", () => {
+    const comparison = getMonthOverMonthComparison(sampleEntries, "kg");
+    expect(comparison.currentMonthAverage).not.toBeNull();
+  });
+
+  it("returns zero streak for empty entries", () => {
+    expect(getLoggingStreak([])).toBe(0);
   });
 });

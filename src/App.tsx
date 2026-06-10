@@ -3,9 +3,11 @@ import type { UserSettings, WeightUnit } from "./types/weight";
 import {
   deleteEntry,
   saveEntryForDate,
+  saveGoalWeight,
   savePreferredUnit,
   updateEntry,
   weightStorage,
+  type UpdateEntryInput,
 } from "./storage/weightStorage";
 import { TodayPage } from "./pages/TodayPage";
 import { ProgressPage } from "./pages/ProgressPage";
@@ -32,14 +34,27 @@ function App(): React.ReactElement {
     setEntries(weightStorage.getEntries());
   }, []);
 
+  const refreshSettings = useCallback((): void => {
+    setSettings(weightStorage.getSettings());
+  }, []);
+
   const handleSaveEntry = (date: string, weight: number, unit: WeightUnit): void => {
     saveEntryForDate(date, weight, unit);
     refreshEntries();
   };
 
-  const handleUpdateEntry = (id: string, weight: number, unit: WeightUnit): void => {
-    updateEntry(id, weight, unit);
+  const handleUpdateEntry = (
+    id: string,
+    input: UpdateEntryInput,
+  ): string | null => {
+    const result = updateEntry(id, input);
+
+    if (!result.success) {
+      return result.error ?? "Could not update entry.";
+    }
+
     refreshEntries();
+    return null;
   };
 
   const handleDeleteEntry = (id: string): void => {
@@ -50,6 +65,16 @@ function App(): React.ReactElement {
   const handlePreferredUnitChange = (preferredUnit: WeightUnit): void => {
     const updatedSettings = savePreferredUnit(preferredUnit);
     setSettings(updatedSettings);
+  };
+
+  const handleGoalWeightChange = (goalWeight?: number): void => {
+    const updatedSettings = saveGoalWeight(goalWeight);
+    setSettings(updatedSettings);
+  };
+
+  const handleImportComplete = (): void => {
+    refreshEntries();
+    refreshSettings();
   };
 
   const renderPage = (): React.ReactElement => {
@@ -78,6 +103,8 @@ function App(): React.ReactElement {
           <SettingsPage
             settings={settings}
             onPreferredUnitChange={handlePreferredUnitChange}
+            onGoalWeightChange={handleGoalWeightChange}
+            onImportComplete={handleImportComplete}
           />
         );
     }

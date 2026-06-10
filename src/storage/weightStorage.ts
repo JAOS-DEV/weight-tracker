@@ -1,6 +1,12 @@
-import type { UserSettings, WeightEntry, WeightUnit } from "../types/weight";
+import type {
+  ExportData,
+  UserSettings,
+  WeightEntry,
+  WeightUnit,
+} from "../types/weight";
 import { getTodayDateString, isValidDateString } from "../utils/dateRanges";
-import { upsertEntryForDate } from "../utils/weightStats";
+import { convertWeight, roundWeight } from "../utils/weightConversions";
+import { sortEntriesByDate, upsertEntryForDate } from "../utils/weightStats";
 
 const ENTRIES_KEY = "weightpal_entries";
 const SETTINGS_KEY = "weightpal_settings";
@@ -24,6 +30,19 @@ export interface WeightValidationResult {
 
 export interface DateValidationResult {
   valid: boolean;
+  error?: string;
+}
+
+export interface UpdateEntryInput {
+  date: string;
+  weight: number;
+  unit: WeightUnit;
+  note?: string;
+}
+
+export interface UpdateEntryResult {
+  success: boolean;
+  entries: WeightEntry[];
   error?: string;
 }
 
@@ -65,6 +84,33 @@ export function validateWeightInput(value: string): WeightValidationResult {
   return { valid: true, weight: parsed };
 }
 
+export function validateGoalWeightInput(
+  value: string,
+): WeightValidationResult {
+  if (!value.trim()) {
+    return { valid: true, weight: undefined };
+  }
+
+  return validateWeightInput(value);
+}
+
+function normalizeSettings(settings: UserSettings): UserSettings {
+  const normalized: UserSettings = {
+    preferredUnit:
+      settings.preferredUnit === "lb" ? "lb" : DEFAULT_SETTINGS.preferredUnit,
+  };
+
+  if (
+    typeof settings.goalWeight === "number" &&
+    Number.isFinite(settings.goalWeight) &&
+    settings.goalWeight > 0
+  ) {
+    normalized.goalWeight = roundWeight(settings.goalWeight);
+  }
+
+  return normalized;
+}
+
 class LocalWeightStorage implements WeightStorage {
   getEntries(): WeightEntry[] {
     try {
@@ -92,22 +138,25 @@ class LocalWeightStorage implements WeightStorage {
       }
 
       const parsed = JSON.parse(raw) as UserSettings;
-      if (parsed?.preferredUnit === "kg" || parsed?.preferredUnit === "lb") {
-        return parsed;
-      }
-
-      return DEFAULT_SETTINGS;
+      return normalizeSettings(parsed);
     } catch {
       return DEFAULT_SETTINGS;
     }
   }
 
   saveSettings(settings: UserSettings): void {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
   }
 }
 
 export const weightStorage: WeightStorage = new LocalWeightStorage();
+
+export function updateSettings(partial: Partial<UserSettings>): UserSettings {
+  const currentSettings = weightStorage.getSettings();
+  const updatedSettings = normalizeSettings({ ...currentSettings, ...partial });
+  weightStorage.saveSettings(updatedSettings);
+  return updatedSettings;
+}
 
 export function saveEntryForDate(
   date: string,
@@ -122,17 +171,42 @@ export function saveEntryForDate(
 
 export function updateEntry(
   id: string,
-  weight: number,
-  unit: WeightUnit,
-): WeightEntry[] {
+  input: UpdateEntryInput,
+): UpdateEntryResult {
   const entries = weightStorage.getEntries();
+  const existingEntry = entries.find((entry) => entry.id === id);
+
+  if (!existingEntry) {
+    return { success: false, entries, error: "Entry not found." };
+  }
+
+  const dateConflict = entries.find(
+    (entry) => entry.date === input.date && entry.id !== id,
+  );
+
+  if (dateConflict) {
+    return {
+      success: false,
+      entries,
+      error: "An entry already exists for this date.",
+    };
+  }
+
   const updatedEntries = entries.map((entry) =>
     entry.id === id
-      ? { ...entry, weight, unit, updatedAt: new Date().toISOString() }
+      ? {
+          ...entry,
+          date: input.date,
+          weight: input.weight,
+          unit: input.unit,
+          note: input.note?.trim() ? input.note.trim() : undefined,
+          updatedAt: new Date().toISOString(),
+        }
       : entry,
   );
+
   weightStorage.saveEntries(updatedEntries);
-  return updatedEntries;
+  return { success: true, entries: updatedEntries };
 }
 
 export function deleteEntry(id: string): WeightEntry[] {
@@ -143,7 +217,65 @@ export function deleteEntry(id: string): WeightEntry[] {
 }
 
 export function savePreferredUnit(preferredUnit: WeightUnit): UserSettings {
-  const settings = { preferredUnit };
-  weightStorage.saveSettings(settings);
-  return settings;
+  const currentSettings = weightStorage.getSettings();
+  let goalWeight = currentSettings.goalWeight;
+
+  if (
+    goalWeight !== undefined &&
+    currentSettings.preferredUnit !== preferredUnit
+  ) {
+    goalWeight = roundWeight(
+      convertWeight(goalWeight, currentSettings.preferredUnit, preferredUnit),
+    );
+  }
+
+  return updateSettings({ preferredUnit, goalWeight });
+}
+
+export function saveGoalWeight(goalWeight?: number): UserSettings {
+  return updateSettings({ goalWeight });
+}
+
+export function exportAppData(): ExportData {
+  return {
+    version: 1,
+    entries: sortEntriesByDate(weightStorage.getEntries(), true),
+    settings: weightStorage.getSettings(),
+    exportedAt: new Date().toISOString(),
+  };
+}
+
+export function importAppData(rawData: string): { success: boolean; error?: string } {
+  try {
+    const parsed = JSON.parse(rawData) as ExportData;
+
+    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.entries)) {
+      return { success: false, error: "Invalid backup file format." };
+    }
+
+    const validEntries = parsed.entries.filter(
+      (entry) =>
+        typeof entry.id === "string" &&
+        typeof entry.date === "string" &&
+        typeof entry.weight === "number" &&
+        (entry.unit === "kg" || entry.unit === "lb"),
+    );
+
+    const dates = new Set<string>();
+    for (const entry of validEntries) {
+      if (dates.has(entry.date)) {
+        return {
+          success: false,
+          error: "Backup contains duplicate dates and cannot be imported.",
+        };
+      }
+      dates.add(entry.date);
+    }
+
+    weightStorage.saveEntries(validEntries);
+    weightStorage.saveSettings(normalizeSettings(parsed.settings ?? DEFAULT_SETTINGS));
+    return { success: true };
+  } catch {
+    return { success: false, error: "Could not read backup file." };
+  }
 }
