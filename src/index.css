@@ -371,7 +371,10 @@ input {
 }
 
 .weight-chart {
-  width: 100%;
+  width: calc(100% + 1.5rem);
+  max-width: calc(100% + 1.5rem);
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
 }
 
 .weight-chart__svg {
@@ -381,8 +384,24 @@ input {
 }
 
 .weight-chart__axis {
-  stroke: #e2e8f0;
+  stroke: #cbd5e1;
   stroke-width: 1;
+}
+
+.weight-chart__grid-line {
+  stroke: #f1f5f9;
+  stroke-width: 1;
+}
+
+.weight-chart__weight-label {
+  fill: #64748b;
+  font-size: 9px;
+}
+
+.weight-chart__axis-unit {
+  fill: #94a3b8;
+  font-size: 8px;
+  font-weight: 600;
 }
 
 .weight-chart__line {
@@ -421,20 +440,13 @@ input {
   fill: #3d5a80;
 }
 
-.weight-chart__labels {
+.weight-chart__legend-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 1rem;
   margin-top: 0.5rem;
   font-size: 0.8rem;
   color: #64748b;
-}
-
-.weight-chart__legend {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
 }
 
 .weight-chart__legend-item {
